@@ -1,1 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test</title></head>
+<body>
+<script>
+(function(){
+  var p = sessionStorage.getItem('auth');
+  if(p !== 'ok'){
+    var input = prompt('Password:');
+    if(input !== 'WJjXtQRpt3@V'){
+      document.write('Access denied.');
+      throw new Error('Access denied');
+    }
+    sessionStorage.setItem('auth','ok');
+  }
+})();
+</script>
 <h1>Test</h1>
+</body>
+</html>
