@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toggle QC — Scan-to-Measurement Pipeline · Architecture Review 2026-06-11</title>
+<style>
+  :root {
+    --bg: #0b0e13;
+    --bg-raised: #11161e;
+    --bg-inset: #0d1118;
+    --line: #1f2733;
+    --text: #d7dde6;
+    --muted: #8a94a3;
+    --faint: #5c6573;
+    --cyan: #6fd3e3;
+    --cyan-dim: #3e7f8c;
+    --red: #ff6369;
+    --red-bg: rgba(229, 72, 77, 0.10);
+    --red-line: rgba(229, 72, 77, 0.45);
+    --green: #56c271;
+    --green-bg: rgba(70, 167, 88, 0.10);
+    --green-line: rgba(70, 167, 88, 0.45);
+    --amber: #ffb224;
+    --amber-bg: rgba(255, 178, 36, 0.08);
+    --amber-line: rgba(255, 178, 36, 0.40);
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --rail-w: 232px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--cyan); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, .mono { font-family: var(--mono); font-size: 0.92em; }
+  code { background: var(--bg-inset); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
+
+  /* ---------- scroll progress ---------- */
+  #progress-bar {
+    position: fixed; top: 0; left: 0; height: 2px; width: 0;
+    background: var(--cyan); z-index: 50;
+  }
+
+  /* ---------- progress rail ---------- */
+  #rail {
+    position: fixed; top: 0; left: 0; bottom: 0; width: var(--rail-w);
+    padding: 28px 20px;
+    border-right: 1px solid var(--line);
+    background: rgba(11, 14, 19, 0.85);
+    backdrop-filter: blur(6px);
+    z-index: 40;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  #rail .rail-title { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 18px; }
+  #rail nav { display: flex; flex-direction: column; gap: 2px; }
+  #rail nav a {
+    display: flex; align-items: baseline; gap: 9px;
+    padding: 6px 8px; border-radius: 6px;
+    color: var(--muted); font-size: 13.5px; line-height: 1.3;
+    border-left: 2px solid transparent;
+  }
+  #rail nav a:hover { color: var(--text); text-decoration: none; background: var(--bg-raised); }
+  #rail nav a .num { font-family: var(--mono); font-size: 11px; color: var(--faint); min-width: 14px; }
+  #rail nav a.active { color: var(--cyan); border-left-color: var(--cyan); background: var(--bg-raised); }
+  #rail nav a.active .num { color: var(--cyan); }
+
+  #rail .timing { margin-top: auto; padding-top: 22px; border-top: 1px solid var(--line); }
+  #rail .timing h4 { margin: 0 0 10px; font-family: var(--mono); font-size: 11px; color: var(--muted); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
+  .tbar { display: flex; height: 10px; border-radius: 3px; overflow: hidden; background: var(--bg-inset); }
+  .tbar span { display: block; height: 100%; }
+  .tlegend { margin: 10px 0 0; padding: 0; list-style: none; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .tlegend li { display: flex; align-items: center; gap: 7px; padding: 1.5px 0; }
+  .tlegend .sw { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+  .tlegend .val { margin-left: auto; color: var(--text); }
+  .t-cap { background: #3a4250; }
+  .t-pre { background: #4f6b8a; }
+  .t-reg { background: var(--cyan); }
+  .t-mea { background: #b88add; }
+  .t-per { background: #6b7686; }
+  #rail .timing .note { font-size: 11px; color: var(--faint); margin: 8px 0 0; line-height: 1.45; }
+
+  /* ---------- layout ---------- */
+  main { margin-left: var(--rail-w); }
+  section.stage {
+    max-width: 880px;
+    padding: 0 56px 96px;
+    margin: 0 auto;
+  }
+  .stage-head {
+    position: sticky; top: 0; z-index: 10;
+    background: rgba(11, 14, 19, 0.88);
+    backdrop-filter: blur(8px);
+    padding: 22px 0 14px;
+    margin-bottom: 26px;
+    border-bottom: 1px solid var(--line);
+  }
+  .stage-head .kicker { font-family: var(--mono); font-size: 12px; color: var(--cyan); letter-spacing: 0.1em; }
+  .stage-head h2 { margin: 4px 0 0; font-size: 27px; font-weight: 650; letter-spacing: -0.01em; }
+  section.stage > :not(.stage-head) { max-width: 760px; }
+  p { margin: 0 0 16px; color: var(--text); }
+  p.lead { font-size: 17.5px; }
+  .dim { color: var(--muted); }
+  ul.tight { margin: 0 0 16px; padding-left: 22px; }
+  ul.tight li { margin-bottom: 8px; }
+  strong { font-weight: 600; color: #fff; }
+
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.55s ease, transform 0.55s ease; }
+  .reveal.visible { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .reveal { opacity: 1; transform: none; transition: none; }
+  }
+
+  /* ---------- executive summary ---------- */
+  .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 0 0 18px; }
+  .summary-grid .col {
+    background: var(--bg-raised); border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px;
+  }
+  .summary-grid h3 { margin: 0 0 10px; font-size: 15px; font-weight: 650; }
+  .summary-grid .col.had h3 { color: var(--red); }
+  .summary-grid .col.done h3 { color: var(--green); }
+  .summary-grid .col.left h3 { color: var(--amber); }
+  .summary-grid ul { margin: 0; padding-left: 18px; font-size: 14px; color: var(--text); }
+  .summary-grid li { margin-bottom: 10px; }
+  .summary-grid li:last-child { margin-bottom: 0; }
+  @media (max-width: 1240px) { .summary-grid { grid-template-columns: 1fr; } }
+
+  /* ---------- callouts ---------- */
+  .callout {
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px; margin: 0 0 18px;
+    background: var(--bg-raised);
+  }
+  .callout .tag {
+    display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 4px; margin-bottom: 9px;
+    color: var(--muted); background: var(--bg-inset);
+  }
+  .callout p:last-child, .callout ul:last-child { margin-bottom: 0; }
+  .callout.incident { border-color: var(--red-line); background: var(--red-bg); }
+  .callout.incident .tag { color: var(--red); background: rgba(229, 72, 77, 0.15); }
+  .callout.fixed { border-color: var(--green-line); background: var(--green-bg); }
+  .callout.fixed .tag { color: var(--green); background: rgba(70, 167, 88, 0.15); }
+  .callout.limit { border-color: var(--amber-line); background: var(--amber-bg); }
+  .callout.limit .tag { color: var(--amber); background: rgba(255, 178, 36, 0.13); }
+
+  /* ---------- tables ---------- */
+  table { width: 100%; border-collapse: collapse; margin: 0 0 18px; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 11.5px; color: var(--muted); font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
+  td .mono { color: var(--text); }
+  tr.win td { background: var(--green-bg); }
+  tr.lose td { background: var(--red-bg); }
+  .badge { display: inline-block; font-family: var(--mono); font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 4px; white-space: nowrap; }
+  .badge.green { color: var(--green); background: rgba(70,167,88,0.15); }
+  .badge.red { color: var(--red); background: rgba(229,72,77,0.15); }
+  .badge.amber { color: var(--amber); background: rgba(255,178,36,0.13); }
+  .badge.grey { color: var(--muted); background: var(--bg-inset); }
+
+  /* ---------- figures ---------- */
+  figure { margin: 0 0 22px; }
+  figure img {
+    width: 100%; display: block; border-radius: 10px;
+    border: 1px solid var(--line); background: #fff;
+  }
+  figcaption { font-size: 13px; color: var(--muted); margin-top: 9px; line-height: 1.55; }
+  figcaption .mono { color: var(--text); }
+
+  /* ---------- inline SVG charts ---------- */
+  figure.chart {
+    background: var(--bg-raised); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px 18px 12px;
+  }
+  figure.chart svg { display: block; width: 100%; height: auto; }
+  figure.chart svg text { font-family: var(--mono); font-size: 12px; fill: var(--muted); }
+  figure.chart svg text.lbl { text-anchor: end; }
+  figure.chart svg text.val { fill: var(--text); }
+  figure.chart svg text.hl { fill: var(--cyan); font-weight: 600; }
+  figure.chart svg text.warn { fill: var(--amber); }
+  figure.chart svg text.mid { text-anchor: middle; }
+  figure.chart svg line.grid { stroke: var(--line); stroke-width: 1; }
+  figure.chart svg line.axis { stroke: var(--faint); stroke-width: 1; }
+  figure.chart svg line.thresh { stroke: var(--amber); stroke-width: 1.5; stroke-dasharray: 5 4; }
+
+  /* ---------- hero ---------- */
+  #hero { position: relative; height: 160vh; }
+  #hero-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; }
+  #hero-canvas { position: absolute; inset: 0; }
+  #hero-canvas canvas { display: block; }
+  #webgl-fallback {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    text-align: center; color: var(--muted); padding: 40px; font-size: 14px;
+  }
+  #webgl-fallback[hidden] { display: none; }
+  #hero-overlay {
+    position: absolute; inset: 0; z-index: 2; pointer-events: none;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 56px 64px 40px;
+  }
+  #hero-overlay h1 { margin: 0; font-size: clamp(30px, 4.4vw, 52px); font-weight: 700; letter-spacing: -0.02em; max-width: 760px; text-shadow: 0 2px 24px rgba(0,0,0,0.7); }
+  #hero-overlay .sub { font-family: var(--mono); font-size: 14px; color: var(--muted); margin-top: 12px; }
+  #hero-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+  #hero-foot .legend { display: flex; gap: 18px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  #hero-foot .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 7px; }
+  #cad-toggle {
+    pointer-events: auto; cursor: pointer;
+    font-family: var(--mono); font-size: 12.5px;
+    color: var(--text); background: var(--bg-raised);
+    border: 1px solid var(--line); border-radius: 7px; padding: 8px 14px;
+  }
+  #cad-toggle:hover { border-color: var(--cyan-dim); color: var(--cyan); }
+  #cad-toggle.on { border-color: var(--cyan); color: var(--cyan); }
+  #hero-foot .hint { font-size: 12px; color: var(--faint); font-family: var(--mono); }
+  #hero-foot .spacer { flex: 1; }
+  .scan-meta { font-family: var(--mono); font-size: 12px; color: var(--muted); line-height: 1.7; text-shadow: 0 1px 12px rgba(0,0,0,0.8); }
+  .scan-meta b { color: var(--cyan); font-weight: 600; }
+
+  @media (max-width: 1000px) {
+    #rail { display: none; }
+    main { margin-left: 0; }
+    section.stage { padding: 0 24px 72px; }
+    #hero-overlay { padding: 40px 28px 28px; }
+  }
+</style>
+</head>
+<script>(function(){var p=sessionStorage.getItem("auth");if(p!=="ok"){var i=prompt("Password:");if(i!=="WJjXtQRpt3@V"){document.body.innerHTML="Access denied.";throw new Error();}sessionStorage.setItem("auth","ok");}})()</script><body>
+
+<div id="progress-bar"></div>
+
+<aside id="rail" aria-label="Section navigation">
+  <div class="rail-title">Toggle QC · Pipeline</div>
+  <nav id="rail-nav">
+    <a href="#summary"><span class="num">·</span>Executive summary</a>
+    <a href="#trigger"><span class="num">1</span>Trigger &amp; CAD fetch</a>
+    <a href="#capture"><span class="num">2</span>Capture</a>
+    <a href="#preprocess"><span class="num">3</span>Preprocess</a>
+    <a href="#registration"><span class="num">4</span>Registration</a>
+    <a href="#identity"><span class="num">5</span>Identity gate</a>
+    <a href="#validation"><span class="num">5b</span>Batch validation</a>
+    <a href="#measurement"><span class="num">6</span>Measurement</a>
+    <a href="#results"><span class="num">7</span>Results &amp; evidence</a>
+    <a href="#state"><span class="num">8</span>State of the work</a>
+  </nav>
+  <div class="timing">
+    <h4>Where the time goes</h4>
+    <div class="tbar" title="Per-stage share of a scan cycle">
+      <span class="t-cap" style="width:1%"></span>
+      <span class="t-pre" style="width:9.8%"></span>
+      <span class="t-reg" style="width:55.2%"></span>
+      <span class="t-mea" style="width:14.7%"></span>
+      <span class="t-per" style="width:19.3%"></span>
+    </div>
+    <ul class="tlegend">
+      <li><i class="sw t-cap"></i>capture<span class="val">&#8810;</span></li>
+      <li><i class="sw t-pre"></i>preprocess<span class="val">~2s</span></li>
+      <li><i class="sw t-reg"></i>registration<span class="val">~11s</span></li>
+      <li><i class="sw t-mea"></i>measurement<span class="val">~3s</span></li>
+      <li><i class="sw t-per"></i>render/persist<span class="val">~4s</span></li>
+    </ul>
+    <p class="note">Registration was 84% of the cycle; two-phase ICP cut it to ~11s of a ~15–27s scan. Section 4 tells that story.</p>
+  </div>
+</aside>
+
+<main>
+
+<!-- ============ 0 · HERO ============ -->
+<header id="hero">
+  <div id="hero-sticky">
+    <div id="hero-canvas"></div>
+    <div id="webgl-fallback" hidden>
+      <div>
+        <p><strong>3D view unavailable</strong> (WebGL not supported or point data failed to load).</p>
+        <p>The hero normally shows the real pilot scan <span class="mono">20260605_095648</span> — 45,000 scan points
+        over 25,000 CAD points of part <span class="mono">40621228</span>. The review content below stands on its own.</p>
+      </div>
+    </div>
+    <div id="hero-overlay">
+      <div>
+        <h1>Toggle QC — Scan-to-Measurement Pipeline</h1>
+        <div class="sub">Architecture review · 2026-06-11 · pilot data from Viewrail 2026-06-05</div>
+        <div class="scan-meta" style="margin-top:22px">
+          scan <b>20260605_095648</b> · part <b>40621228</b> · result <b>PASS</b><br>
+          the overlay below is the pipeline&rsquo;s actual alignment output<br>
+          (fitness <b>0.121</b>, RMSE <b>1.11mm</b> on the downsampled display clouds)
+        </div>
+      </div>
+      <div id="hero-foot">
+        <div class="legend">
+          <span><i style="background:#7fdbe6"></i>scan · 45,000 pts</span>
+          <span><i style="background:#9aa1ac"></i>CAD · 25,000 pts</span>
+        </div>
+        <button id="cad-toggle" type="button">CAD overlay: auto</button>
+        <span class="hint">drag to orbit · scroll to continue</span>
+        <span class="spacer"></span>
+        <span class="hint">8 stages, one scan cycle ↓</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ EXECUTIVE SUMMARY ============ -->
+<section class="stage" id="summary">
+  <div class="stage-head">
+    <span class="kicker">SUMMARY</span>
+    <h2>The short version</h2>
+  </div>
+  <p class="lead reveal">The station scans a part, compares it to its design file, and passes or fails it. Here is where that stood, what we changed, and what remains.</p>
+  <div class="summary-grid reveal">
+    <div class="col had">
+      <h3>Issues we had</h3>
+      <ul>
+        <li>Scans sometimes locked on upside-down or backwards, so measurements were taken in the wrong places yet looked confident.</li>
+        <li>Scanning a part against the wrong design file could still produce passing measurements.</li>
+        <li>The cleanup steps could quietly delete real parts of the scan, and the display made it look worse with checkerboard holes.</li>
+        <li>A full scan took 1&ndash;5 minutes.</li>
+      </ul>
+    </div>
+    <div class="col done">
+      <h3>Issues we fixed</h3>
+      <ul>
+        <li>Flipped poses are now detected and rejected — the system says &ldquo;I can&rsquo;t trust this scan&rdquo; instead of guessing, verified by replaying the actual bad scan from the pilot.</li>
+        <li>A new identity check refuses to measure when the part doesn&rsquo;t match the design file&rsquo;s size and shape.</li>
+        <li>Every cleanup step now reports what it removed and blocks the scan if it removes too much, and the checkerboard display bug is fixed.</li>
+        <li>Registration is up to ~6&ndash;25&times; faster (72s &rarr; 12–20s, measured on the same scan); a full scan now runs ~15–27s end-to-end.</li>
+      </ul>
+    </div>
+    <div class="col left">
+      <h3>What's left and why</h3>
+      <ul>
+        <li>Refining the new safety thresholds — a first calibration pass is done from the 60-scan corpus (every pilot and reference scan replayed); refinement continues as more field scans arrive.</li>
+        <li>Two near-identical part variants can&rsquo;t be told apart from a top view alone — that needs a finer check.</li>
+        <li>A missing small feature (like a 50mm notch) can still go unnoticed by the measurement — the fix is designed, queued behind the core work.</li>
+        <li>Flat parts measure their <em>long</em> dimension with &plusmn;2&ndash;3mm repeatability &mdash; a camera-geometry limit, not a software bug (see Measurement); it needs a hardware or process answer.</li>
+        <li>The merge and review of the four pull requests.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 1 · TRIGGER ============ -->
+<section class="stage" id="trigger">
+  <div class="stage-head">
+    <span class="kicker">STAGE 1</span>
+    <h2>Trigger &amp; CAD fetch</h2>
+  </div>
+  <p class="lead reveal">The station learns which part is coming and fetches its CAD file.</p>
+  <p class="reveal">A QR scan by the operator, or an ERP call to <code>/api/v1/erp/trigger</code>, resolves the part number. The STEP file is downloaded from AWS and cached for the rest of the cycle.</p>
+  <div class="callout reveal">
+    <span class="tag">Pilot note</span>
+    <p>During the pilot, wrong CAD files were sometimes loaded (including deliberately, as a test). The pipeline at the time measured against them anyway — the <a href="#identity">identity gate</a> (section 5) now refuses to.</p>
+  </div>
+</section>
+
+<!-- ============ 2 · CAPTURE ============ -->
+<section class="stage" id="capture">
+  <div class="stage-head">
+    <span class="kicker">STAGE 2</span>
+    <h2>Capture</h2>
+  </div>
+  <p class="lead reveal">A ceiling camera takes one 3D snapshot of the part.</p>
+  <p class="reveal">The MechMind camera captures <strong>3,145,728 pixels</strong> on a fixed <strong>2048&times;1536</strong> grid; a typical scene yields <strong>~240k&ndash;550k valid 3D points</strong>. Stage <code>S1</code> stores the capture settings (depth range, ROI, smoothing) with the scan, so &ldquo;what did the camera do&rdquo; always has an answer on disk.</p>
+</section>
+
+<!-- ============ 3 · PREPROCESS ============ -->
+<section class="stage" id="preprocess">
+  <div class="stage-head">
+    <span class="kicker">STAGE 3</span>
+    <h2>Preprocess</h2>
+  </div>
+  <p class="lead reveal">Cleanup: the raw snapshot is cut down to just the part — and every cut is now accounted for.</p>
+  <ul class="tight reveal">
+    <li><strong><code>S2</code> finite filter</strong> — drops no-return pixels (<span class="mono">3.1M &rarr; 244k</span> on a typical scan), labeled <code>loss_source=camera</code>.</li>
+    <li><strong><code>S3</code> depth crop</strong> — window derived from the camera&rsquo;s configured near/far range, not a hardcoded 500mm.</li>
+    <li><strong><code>S4</code> statistical cleaning</strong> — measured <strong>94&ndash;97% point and voxel retention</strong> across all pilot scans.</li>
+  </ul>
+  <div class="callout fixed reveal">
+    <span class="tag">Fixed · PR #54</span>
+    <p><strong>&ldquo;Fractal chunks.&rdquo;</strong> Over the point cap, the display sampler kept lowest-hash voxels — which selects nested square regions. It looked like missing data; it was only a display artifact.</p>
+  </div>
+  <div class="callout fixed reveal">
+    <span class="tag">Fixed · PR #56</span>
+    <p><strong>Gates that could never fire.</strong> A kind-filter bug meant <code>S4</code> could never trigger its safety block, and a stage could erase a whole region while keeping point counts plausible. Cleaning is now gated on <strong>occupied-voxel retention</strong>: block below <strong>70%</strong>, against <strong>94&ndash;97% measured headroom</strong>.</p>
+  </div>
+</section>
+
+<!-- ============ 4 · REGISTRATION ============ -->
+<section class="stage" id="registration">
+  <div class="stage-head">
+    <span class="kicker">STAGE 4 · THE CENTERPIECE</span>
+    <h2>Registration</h2>
+  </div>
+  <p class="lead reveal">The scan is lined up with the CAD model. This is the slowest step — and where the worst failure mode lived.</p>
+  <p class="reveal">The design: generate many candidate poses cheaply, refine them all, and let scoring — not luck — pick the winner.</p>
+
+  <h3 class="reveal">Candidate pose generation</h3>
+  <ul class="tight reveal">
+    <li>Up to <strong>10 FPFH+RANSAC attempts</strong>, pre-ranked, <strong>top 4 kept</strong>.</li>
+    <li><strong>4 B-Rep-axis seeds</strong> + <strong>4 PCA sign-flip seeds</strong>, never pruned — they rescue flat and partial scans.</li>
+    <li>All candidates share a <strong>multi-scale ICP pyramid (5 scales)</strong>, refined on <strong>4 worker threads</strong> in <strong>two phases</strong>: every candidate runs the two cheap coarse scales; only the <strong>best 4 plus near-ties</strong> continue to the fine scales, with per-scale clouds capped at <strong>150k points</strong>.</li>
+    <li>Scored by a <strong>9-component tuple</strong>; feature coverage is the component that discriminates flips.</li>
+  </ul>
+
+  <h3 class="reveal">Timing — the speed arc</h3>
+  <figure class="chart reveal">
+    <svg viewBox="0 0 720 200" role="img" aria-label="Registration time across four milestones: station on June 5 ranged 70 to 285 seconds, PR 45 took 72 seconds, the first optimization about 51 seconds, and two-phase ICP 12–20 seconds">
+      <line class="grid" x1="170" y1="10" x2="170" y2="164"/>
+      <line class="grid" x1="277.6" y1="10" x2="277.6" y2="164"/>
+      <line class="grid" x1="385.2" y1="10" x2="385.2" y2="164"/>
+      <line class="grid" x1="492.8" y1="10" x2="492.8" y2="164"/>
+      <line class="grid" x1="600.3" y1="10" x2="600.3" y2="164"/>
+      <text class="lbl" x="160" y="32">Station &middot; June 5</text>
+      <rect x="295.5" y="18" width="385.5" height="20" rx="4" fill="rgba(229,72,77,0.45)" stroke="rgba(229,72,77,0.7)"/>
+      <text class="val mid" x="488" y="32">70&ndash;285s</text>
+      <text class="lbl" x="160" y="70">PR #45</text>
+      <rect x="170" y="56" width="129.1" height="20" rx="4" fill="#55606e"/>
+      <text class="val" x="307" y="70">72s</text>
+      <text class="lbl" x="160" y="108">first optimization</text>
+      <rect x="170" y="94" width="91.4" height="20" rx="4" fill="#4f6b8a"/>
+      <text class="val" x="269" y="108">~51s</text>
+      <text class="lbl" x="160" y="146">two-phase ICP</text>
+      <rect x="170" y="132" width="20.3" height="20" rx="4" fill="#6fd3e3"/>
+      <text class="hl" x="198" y="146">12–20s</text>
+      <text class="hl" x="248" y="146">&larr; ~6&ndash;25&times; faster</text>
+      <line class="axis" x1="170" y1="164" x2="690" y2="164"/>
+      <text class="mid" x="170" y="182">0s</text>
+      <text class="mid" x="277.6" y="182">60s</text>
+      <text class="mid" x="385.2" y="182">120s</text>
+      <text class="mid" x="492.8" y="182">180s</text>
+      <text class="mid" x="600.3" y="182">240s</text>
+    </svg>
+    <figcaption><strong>Registration time per scan, linear scale.</strong> The June 5 station floated between 70 and 285s; two-phase ICP lands the same answer in 12–20s.</figcaption>
+  </figure>
+  <p class="reveal"><strong>12–20s registration, ~15–27s end-to-end</strong>, verified on the pilot control pair: FPFH+RANSAC <strong>6.5s</strong>, pyramid <strong>0.4s</strong>, ICP <strong>4.0s</strong>. <strong>8 of 12 candidates pruned at the coarse scales</strong>; the winning pose is identical to every previous run, with fitness slightly better (<span class="mono">0.179</span> vs <span class="mono">0.177</span>).</p>
+
+  <div class="callout incident reveal">
+    <span class="tag">Incident · the flip</span>
+    <p>On June 5 a <strong>180°-flipped pose won</strong> on a partial capture and reported an edge at <strong>+58mm as fact</strong>. Worse: the flipped pose fits the <em>surface</em> better. Surface fit alone cannot catch this.</p>
+    <table>
+      <thead>
+        <tr><th>candidate</th><th>surface-median</th><th>feature coverage</th><th>verdict</th></tr>
+      </thead>
+      <tbody>
+        <tr class="win">
+          <td class="mono">brep(-1,-1,1) · correct</td>
+          <td class="mono">0.46 mm</td>
+          <td class="mono"><strong>1.1 mm</strong></td>
+          <td><span class="badge green">WINS</span></td>
+        </tr>
+        <tr class="lose">
+          <td class="mono">flipped poses</td>
+          <td class="mono">0.45 mm <span class="dim">(better!)</span></td>
+          <td class="mono"><strong>101.6 mm</strong></td>
+          <td><span class="badge red">rejected</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p>Coverage is the <em>only</em> signal that separates them — so it sits in the scoring tuple as the flip discriminator.</p>
+  </div>
+
+  <div class="callout fixed reveal">
+    <span class="tag">Fixed · PR #54 · three layers</span>
+    <ul class="tight">
+      <li><strong>Scanner-oriented normal agreement</strong> rejects upside-down poses outright; the incident scan logs two candidates rejected at agreement <span class="mono">&minus;0.66</span>.</li>
+      <li><strong>Ambiguity margin:</strong> the winner must lead its best credible rival by <strong>&ge;5mm coverage</strong>, or the scan returns <code>ambiguous_registration</code> with <strong>zero measurements</strong>. No confident wrong answers.</li>
+      <li><strong>Full candidate persistence:</strong> every candidate&rsquo;s transform, scores, and rejection reason is stored per scan.</li>
+    </ul>
+  </div>
+
+  <figure class="reveal">
+    <img src="assets/eval_flipped_incident.png" alt="Batch-evaluator replay of the flipped-pose incident scan: result is error, identity wrong_part, all measurements missing" loading="lazy">
+    <figcaption>Incident scan <span class="mono">20260605_102135</span> replayed through the fixed pipeline: <span class="mono">result=ERROR</span>, coverage <span class="mono">24.1</span>, every measurement <span class="mono">missing</span> — it is <strong>never measured</strong>. Left panel: top-down footprint (X/Z); right panel: side profile (X/Y).</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 5 · IDENTITY GATE ============ -->
+<section class="stage" id="identity">
+  <div class="stage-head">
+    <span class="kicker">STAGE 5 · NEW IN PR #55</span>
+    <h2>Identity gate</h2>
+  </div>
+  <p class="lead reveal">Before measuring: is the part on the table actually the part the CAD describes? Three checks, all from coarse geometry:</p>
+  <ul class="tight reveal">
+    <li><strong>On-surface share</strong> — at least <strong>35%</strong> of the scan within <strong>5mm</strong> of the CAD surface.</li>
+    <li><strong>Footprint along CAD principal axes</strong> — excess: <strong>&plusmn;8mm</strong> before <code>ambiguous</code>, <strong>&plusmn;16mm</strong> before <code>wrong_part</code>. Deficit only ever yields <code>ambiguous_part</code> (<strong>15mm</strong> tolerance) — a single view can scan short, never long.</li>
+    <li><strong>Height excess</strong> — asymmetric by design: the camera can <em>under-see</em> height, never <em>over-see</em> it.</li>
+  </ul>
+
+  <h3 class="reveal">Replay results</h3>
+  <figure class="reveal">
+    <img src="assets/eval_wrong_step.png" alt="Wrong-STEP replay: error, identity wrong_part, footprint axis 0 measures 1067mm vs CAD 1194mm" loading="lazy">
+    <figcaption><strong>Wrong-STEP scan &rarr; blocked.</strong> <span class="mono">20260605_113100</span>, part <span class="mono">40621228</span> measured against a wrong CAD file: footprint axis 0 measures <span class="mono">1067mm vs CAD 1194mm (delta 127mm)</span> &rarr; <span class="mono">identity=wrong_part</span>, no measurements. Left panel: top-down footprint (X/Z); right panel: side profile (X/Y).</figcaption>
+  </figure>
+  <p class="reveal"><strong>Wrong family</strong> &rarr; registration collapses first; the gate never has to argue. <strong>Matched parts</strong> &rarr; gate ok:</p>
+  <figure class="reveal">
+    <img src="assets/eval_known_good.png" alt="Known-good replay: PASS, identity ok, length pass" loading="lazy">
+    <figcaption><strong>Matched part &rarr; gate ok.</strong> <span class="mono">20260605_095648</span> (the hero scan): <span class="mono">PASS</span>, <span class="mono">identity=ok</span>, <span class="mono">length=pass</span>, zero rejected poses. Left panel: top-down footprint (X/Z); right panel: side profile (X/Y).</figcaption>
+  </figure>
+
+  <h3 class="reveal">Honest limits</h3>
+  <div class="callout limit reveal">
+    <span class="tag">Known limit</span>
+    <p><strong>Sibling variants look identical from above.</strong> A01 vs A03 top-view envelopes: <span class="mono">876.7&times;275.2</span> vs <span class="mono">876.6&times;274.4mm</span>. No footprint rule can separate 0.1mm of envelope.</p>
+  </div>
+  <div class="callout limit reveal">
+    <span class="tag">Known limit · fix designed, deferred</span>
+    <p><strong>A missing 50mm notch false-passes today.</strong> A continuous straight edge contains point pairs at every separation, so endpoint snapping reproduces the nominal length even when the notch isn&rsquo;t there. The fix (edge-support validation + residual-region clustering) is designed and queued behind core work.</p>
+  </div>
+  <div class="callout fixed reveal">
+    <span class="tag">Tuned · batch validation</span>
+    <p><strong>The footprint <em>deficit</em> rule over-rejected partial captures.</strong> A single camera view loses up to ~8mm at glancing edges and far more on partial captures, so deficit now only ever yields <code>ambiguous_part</code> (15mm tolerance); excess — impossible for the right part — stays definitive. Calibrated from the <a href="#validation">batch run over every pilot scan</a>.</p>
+  </div>
+</section>
+
+<!-- ============ 5b · BATCH VALIDATION ============ -->
+<section class="stage" id="validation">
+  <div class="stage-head">
+    <span class="kicker">STAGE 5 · VALIDATION</span>
+    <h2>Validated against every pilot scan</h2>
+  </div>
+  <p class="lead reveal">The autonomous batch evaluation replayed the full corpus — <strong>60 scans</strong> (42 pilot + 18 reference) — through the pipeline. <strong>Zero crashes.</strong></p>
+  <ul class="tight reveal">
+    <li>All <strong>5 known incidents blocked</strong> with <strong>zero measurements emitted</strong>: the flipped scan, 2 wrong-CAD scans, and 2 oversized junk captures.</li>
+    <li>All known-good controls still pass; all legitimate station FAILs still fail.</li>
+  </ul>
+
+  <figure class="chart reveal">
+    <svg viewBox="0 0 680 86" role="img" aria-label="First-pass corpus outcomes: 8 pass, 16 fail, 36 error">
+      <text x="10" y="13">first-pass outcomes</text>
+      <rect x="10" y="24" width="88" height="26" fill="rgba(86,194,113,0.75)"/>
+      <rect x="98" y="24" width="176" height="26" fill="rgba(255,99,105,0.65)"/>
+      <rect x="274" y="24" width="396" height="26" fill="rgba(255,178,36,0.6)"/>
+      <text class="mid" x="54" y="68" fill="#56c271">pass &middot; 8</text>
+      <text class="mid" x="186" y="68" fill="#ff6369">fail &middot; 16</text>
+      <text class="mid" x="472" y="68" fill="#ffb224">error &middot; 36</text>
+    </svg>
+    <figcaption><strong>Corpus outcomes, first pass.</strong> The error group is the safety rails doing their job — plus some over-rejection. After tuning, it shrinks by the false-rejections; the re-validated subset is shown in the table below.</figcaption>
+  </figure>
+
+  <h3 class="reveal">Calibration findings — amber to green</h3>
+  <p class="reveal">The first pass <strong>over-rejected ~9 known-good scans</strong>, for two root causes. Both were fixed the same day:</p>
+  <ul class="tight reveal">
+    <li><strong>ICP &ldquo;basin twins.&rdquo;</strong> Two near-identical minima a few mm apart looked like a rival pose with a 0.2&ndash;0.5mm margin. Fix: same-pose deduplication widened from <span class="mono">2.5mm</span> to <span class="mono">10mm</span>.</li>
+    <li><strong>Footprint deficit treated as <code>wrong_part</code>.</strong> A single camera view loses up to ~8mm at glancing edges and far more on partial captures. Fix: deficit now only ever yields <code>ambiguous_part</code> (15mm tolerance); excess — impossible for the right part — stays definitive.</li>
+  </ul>
+
+  <figure class="chart reveal">
+    <svg viewBox="0 0 680 155" role="img" aria-label="Strip plot of the 21 real pre-tuning rival margins in millimeters on a log scale, with the 5 millimeter ambiguity threshold marked; eight margins below 5 millimeters are ICP basin twins, the remaining thirteen are genuine pose separations">
+      <text class="warn mid" x="207" y="24">ICP basin twins (now deduplicated)</text>
+      <text class="hl mid" x="507" y="24">genuine pose separations</text>
+      <line class="thresh" x1="358.9" y1="34" x2="358.9" y2="112"/>
+      <text class="warn" x="365" y="48">5mm ambiguity threshold</text>
+      <circle cx="66.2" cy="78" r="5" fill="#ffb224" opacity="0.85"/>
+      <circle cx="149.5" cy="70" r="5" fill="#ffb224" opacity="0.85"/>
+      <circle cx="149.5" cy="86" r="5" fill="#ffb224" opacity="0.85"/>
+      <circle cx="266" cy="78" r="5" fill="#ffb224" opacity="0.85"/>
+      <circle cx="270.9" cy="64" r="5" fill="#ffb224" opacity="0.85"/>
+      <circle cx="284.2" cy="90" r="5" fill="#ffb224" opacity="0.85"/>
+      <circle cx="333.9" cy="74" r="5" fill="#ffb224" opacity="0.85"/>
+      <circle cx="347.3" cy="86" r="5" fill="#ffb224" opacity="0.85"/>
+      <circle cx="398.2" cy="72" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="400.5" cy="86" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="465.8" cy="78" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="479.3" cy="64" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="480.3" cy="78" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="481.3" cy="92" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="487.7" cy="70" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="488.1" cy="86" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="534.3" cy="74" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="540.2" cy="88" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="599.9" cy="70" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="603.9" cy="84" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <circle cx="616.3" cy="78" r="5" fill="#6fd3e3" opacity="0.85"/>
+      <line class="axis" x1="40" y1="112" x2="640" y2="112"/>
+      <text class="mid" x="66.2" y="130">0.2</text>
+      <text class="mid" x="149.5" y="130">0.5</text>
+      <text class="mid" x="212.5" y="130">1</text>
+      <text class="mid" x="275.6" y="130">2</text>
+      <text class="mid" x="358.9" y="130">5</text>
+      <text class="mid" x="421.9" y="130">10</text>
+      <text class="mid" x="485" y="130">20</text>
+      <text class="mid" x="568.3" y="130">50</text>
+      <text class="mid" x="631.3" y="130">100</text>
+      <text x="650" y="130">mm</text>
+    </svg>
+    <figcaption><strong>The 21 real pre-tuning rival margins, in mm (log scale).</strong> The sub-5mm cluster is ICP basin twins — the same pose found twice, now deduplicated away. Everything to the right is a genuine pose separation. This is how the 5mm ambiguity threshold was calibrated from real scans rather than guessed.</figcaption>
+  </figure>
+
+  <h3 class="reveal">16-scan re-validation after tuning</h3>
+  <table class="reveal">
+    <thead>
+      <tr><th>scan</th><th>role</th><th>before tuning</th><th>after tuning</th></tr>
+    </thead>
+    <tbody>
+      <tr class="win">
+        <td class="mono">143544</td>
+        <td>station PASS, falsely flagged</td>
+        <td><span class="badge amber">ambiguous_registration</span></td>
+        <td><span class="badge green">PASS ✓</span></td>
+      </tr>
+      <tr class="win">
+        <td class="mono">ref_105545</td>
+        <td>known-good reference</td>
+        <td><span class="badge amber">ambiguous_part</span></td>
+        <td><span class="badge green">measured ✓</span></td>
+      </tr>
+      <tr class="win">
+        <td class="mono">ref_105658</td>
+        <td>known-good reference</td>
+        <td><span class="badge amber">ambiguous_part</span></td>
+        <td><span class="badge green">measured ✓</span></td>
+      </tr>
+      <tr>
+        <td class="mono">102135</td>
+        <td>flipped-scan incident</td>
+        <td><span class="badge red">blocked</span></td>
+        <td><span class="badge green">still blocked ✓</span></td>
+      </tr>
+      <tr>
+        <td class="mono">113100</td>
+        <td>wrong-CAD incident</td>
+        <td><span class="badge red">blocked</span></td>
+        <td><span class="badge green">still blocked ✓</span></td>
+      </tr>
+      <tr>
+        <td class="mono">095648 / 140358 / 151511</td>
+        <td>known-good controls</td>
+        <td><span class="badge green">pass</span></td>
+        <td><span class="badge green">pass ✓</span></td>
+      </tr>
+      <tr>
+        <td class="mono">150534</td>
+        <td>genuine coverage near-tie</td>
+        <td><span class="badge red">blocked</span></td>
+        <td><span class="badge amber">still blocked · under investigation</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="reveal">The incidents are still blocked — now labeled <code>ambiguous_part</code>: <em>&ldquo;can&rsquo;t confirm identity,&rdquo;</em> the honest verdict for a partial capture. One residual case remains under investigation: <span class="mono">150534</span>, a genuine coverage near-tie.</p>
+
+  <figure class="reveal">
+    <img src="assets/eval_recovered_pass.png" alt="Batch-evaluator evidence for scan 143544: falsely flagged ambiguous before tuning, clean PASS after the dedup fix" loading="lazy">
+    <figcaption><strong>Scan <span class="mono">143544</span> (part <span class="mono">40705680</span>):</strong> falsely flagged ambiguous before tuning, clean PASS after — the dedup fix in action.</figcaption>
+  </figure>
+</section>
+
+<!-- ============ 6 · MEASUREMENT ============ -->
+<section class="stage" id="measurement">
+  <div class="stage-head">
+    <span class="kicker">STAGE 6</span>
+    <h2>Measurement</h2>
+  </div>
+  <p class="lead reveal">Each requested feature is measured against the aligned scan.</p>
+  <p class="reveal">Edges and distances use a <strong>CAD-proximity-filtered support cloud</strong>; planes and slots use the <strong>full cleaned scan</strong>. When there is nothing to snap to, the result says <em>&ldquo;no scan coverage at endpoint (nearest point N&nbsp;mm away)&rdquo;</em> instead of quietly extrapolating.</p>
+  <ul class="tight reveal">
+    <li><strong>Matched part</strong> (validation): 6 distances, all within <strong>&plusmn;2.6mm</strong>.</li>
+    <li><strong>Notch part</strong>: the 3 annotated notch edges measured <strong>51.4 / 48.1 / 48.0mm</strong> at <strong>&le;0.13mm deviation</strong> under the correct pose.</li>
+  </ul>
+
+  <div class="callout limit reveal">
+    <span class="tag">Hardware limit &middot; not fixable in software</span>
+    <p><strong>Flat treads measure their long dimension with &plusmn;2&ndash;3mm repeatability.</strong>
+    Seen from above, a flat board is pinned along its length only by the few scan points on its
+    two end edges &mdash; the broad top surface says nothing about where the part starts and stops.
+    With so little geometry constraining that axis, the solved pose (and every distance measured
+    along it) can legitimately land 2&ndash;3mm differently between scans or software versions,
+    while width and height stay stable.</p>
+    <p>We saw this directly in the corpus: scan <span class="mono">132636</span> disagrees along
+    the length axis between the station and <em>every</em> version of our pipeline &mdash; the
+    differences are translations of the same correct pose, not registration errors. No software
+    change can add information the camera did not capture.</p>
+    <p><strong>What can address it:</strong> reporting per-axis confidence with each measurement
+    (so a &plusmn;5mm tolerance on a weakly-constrained axis is flagged), fixturing or a second
+    angled view that exposes the part ends, or tolerance policy that treats along-axis distances
+    differently. This needs a hardware/process decision, not a patch.</p>
+  </div>
+</section>
+
+<!-- ============ 7 · RESULTS ============ -->
+<section class="stage" id="results">
+  <div class="stage-head">
+    <span class="kicker">STAGE 7</span>
+    <h2>Results &amp; evidence</h2>
+  </div>
+  <p class="lead reveal">Every decision the pipeline makes leaves evidence you can inspect.</p>
+  <ul class="tight reveal">
+    <li><strong>Heatmap + overlay</strong> ship to the viewer as a base64 <code>Float32Array</code> over QWebChannel — <strong>~4&times; smaller</strong> than a JSON payload.</li>
+    <li><strong>Removed-points toggle</strong> in the viewer, colored by loss source.</li>
+    <li><strong>Per-stage reports</strong> and <strong>every registration candidate + margin</strong> persisted to SQLite.</li>
+    <li><strong>One shared result builder</strong> for the ERP and UI paths — they can never disagree.</li>
+  </ul>
+  <p class="reveal">The <strong>60-scan batch evaluator</strong> (<code>tools/batch_eval_scans.py</code>) replays the corpus and renders annotated evidence per scan. The images on this page came out of it — see <a href="#validation">the batch validation</a>.</p>
+</section>
+
+<!-- ============ 8 · STATE ============ -->
+<section class="stage" id="state">
+  <div class="stage-head">
+    <span class="kicker">STAGE 8</span>
+    <h2>State of the work</h2>
+  </div>
+  <p class="lead reveal">Four stacked PRs, reviewed bottom-up:</p>
+  <table class="reveal">
+    <thead>
+      <tr><th>PR</th><th>scope</th><th>issue</th><th>status</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="mono">#45</td>
+        <td>Foundation</td>
+        <td class="mono">—</td>
+        <td><span class="badge green">all review comments resolved · CI green</span> <span class="badge grey">awaiting review</span></td>
+      </tr>
+      <tr>
+        <td class="mono">#54</td>
+        <td>Orientation + margin + speed</td>
+        <td class="mono">TOGGLEQC-139</td>
+        <td><span class="badge grey">stacked on #45</span></td>
+      </tr>
+      <tr>
+        <td class="mono">#55</td>
+        <td>Identity gate</td>
+        <td class="mono">TOGGLEQC-144</td>
+        <td><span class="badge grey">stacked on #54</span></td>
+      </tr>
+      <tr>
+        <td class="mono">#56</td>
+        <td>Preprocessing gates</td>
+        <td class="mono">TOGGLEQC-138</td>
+        <td><span class="badge grey">stacked on #55</span></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 class="reveal">Open items</h3>
+  <ul class="tight reveal">
+    <li><span class="badge amber">tuning</span> Threshold calibration — first pass done from the 60-scan corpus; refinement continues with more field scans.</li>
+    <li><span class="badge amber">investigating</span> Scan <span class="mono">150534</span> — a genuine coverage near-tie, still blocked.</li>
+    <li><span class="badge amber">designed</span> Notch-class fix (edge-support validation + residual-region clustering).</li>
+  </ul>
+  <p class="dim reveal" style="margin-top:28px; font-size:13px;">Toggle QC architecture review · 2026-06-11 · Samay, Mateo, Tanaya · all numbers from the 2026-06-05 Viewrail pilot and the 60-scan batch corpus.</p>
+</section>
+
+</main>
+
+<script src="assets/three.min.js"></script>
+<script src="assets/clouds.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- scroll progress bar ---------- */
+  var bar = document.getElementById("progress-bar");
+  function updateBar() {
+    var max = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.width = (max > 0 ? (window.scrollY / max) * 100 : 0) + "%";
+  }
+  window.addEventListener("scroll", updateBar, { passive: true });
+  updateBar();
+
+  /* ---------- progress rail active state ---------- */
+  var navLinks = Array.prototype.slice.call(document.querySelectorAll("#rail-nav a"));
+  var sections = navLinks.map(function (a) {
+    return document.getElementById(a.getAttribute("href").slice(1));
+  });
+  function updateNav() {
+    var mark = window.innerHeight * 0.35;
+    var active = -1;
+    for (var i = 0; i < sections.length; i++) {
+      if (sections[i].getBoundingClientRect().top <= mark) active = i;
+    }
+    navLinks.forEach(function (a, i) { a.classList.toggle("active", i === active); });
+  }
+  window.addEventListener("scroll", updateNav, { passive: true });
+  updateNav();
+
+  /* ---------- reveal-on-scroll ---------- */
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add("visible"); io.unobserve(e.target); }
+      });
+    }, { rootMargin: "0px 0px -8% 0px" });
+    document.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+  } else {
+    document.querySelectorAll(".reveal").forEach(function (el) { el.classList.add("visible"); });
+  }
+
+  /* ---------- hero point cloud ---------- */
+  var holder = document.getElementById("hero-canvas");
+  var fallbackEl = document.getElementById("webgl-fallback");
+  var hero = document.getElementById("hero");
+  var toggleBtn = document.getElementById("cad-toggle");
+
+  function showFallback() {
+    fallbackEl.hidden = false;
+    if (toggleBtn) toggleBtn.style.display = "none";
+  }
+
+  if (!window.THREE || !window.TOGGLE_CLOUDS || !window.WebGLRenderingContext) {
+    showFallback();
+    return;
+  }
+
+  var renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+    if (!renderer.getContext()) throw new Error("no context");
+  } catch (err) {
+    showFallback();
+    return;
+  }
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  holder.appendChild(renderer.domElement);
+
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(42, 1, 1, 12000);
+  // Shared frame is Y-up (part footprint in the XZ plane).
+  camera.up.set(0, 1, 0);
+
+  function makePoints(flat, color, size, opacity) {
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(flat), 3));
+    var mat = new THREE.PointsMaterial({
+      color: color,
+      size: size,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: opacity,
+      depthWrite: false
+    });
+    return new THREE.Points(geo, mat);
+  }
+
+  // Both clouds are in one shared frame, mm: the scan was aligned to its CAD by
+  // the real registration pipeline (fitness 0.121, RMSE 1.11mm on these display
+  // clouds — see assets/clouds.json "note"). Rendered raw, no remapping.
+  var scanPts = makePoints(window.TOGGLE_CLOUDS.scan, 0x7fdbe6, 2.4, 0.9);
+  var cadPts = makePoints(window.TOGGLE_CLOUDS.cad, 0x9aa1ac, 2.0, 0.0);
+  scene.add(scanPts);
+  scene.add(cadPts);
+
+  /* orbit state */
+  var theta = 0.9, phi = 1.0, radius = 1250;
+  var dragging = false, lastX = 0, lastY = 0, lastInteraction = 0;
+
+  function placeCamera() {
+    var sp = Math.sin(phi), cp = Math.cos(phi);
+    camera.position.set(
+      radius * sp * Math.cos(theta),
+      radius * cp,
+      radius * sp * Math.sin(theta)
+    );
+    camera.lookAt(0, 0, 0);
+  }
+
+  renderer.domElement.style.touchAction = "pan-y";
+  renderer.domElement.addEventListener("pointerdown", function (e) {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    lastInteraction = performance.now();
+    renderer.domElement.setPointerCapture(e.pointerId);
+  });
+  renderer.domElement.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    theta -= (e.clientX - lastX) * 0.005;
+    phi -= (e.clientY - lastY) * 0.005;
+    phi = Math.max(0.15, Math.min(Math.PI - 0.15, phi));
+    lastX = e.clientX;
+    lastY = e.clientY;
+    lastInteraction = performance.now();
+  });
+  window.addEventListener("pointerup", function () { dragging = false; });
+
+  function resize() {
+    var w = holder.clientWidth || window.innerWidth;
+    var h = holder.clientHeight || window.innerHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  /* CAD overlay: scroll-driven by default, button overrides */
+  var cadMode = "auto"; // "auto" | "on" | "off"
+  toggleBtn.addEventListener("click", function () {
+    cadMode = cadMode === "on" ? "off" : "on";
+    toggleBtn.textContent = "CAD overlay: " + cadMode;
+    toggleBtn.classList.toggle("on", cadMode === "on");
+  });
+
+  function heroScrollFraction() {
+    var r = hero.getBoundingClientRect();
+    var travel = r.height - window.innerHeight;
+    if (travel <= 0) return 0;
+    return Math.max(0, Math.min(1, -r.top / travel));
+  }
+
+  var running = true;
+  function frame(now) {
+    requestAnimationFrame(frame);
+    var f = heroScrollFraction();
+    var heroVisible = hero.getBoundingClientRect().bottom > 0;
+    if (!heroVisible) {
+      if (running) { running = false; }
+      return; // hero fully scrolled past: skip rendering
+    }
+    running = true;
+
+    // auto-orbit, paused for 3s after the user drags
+    if (!dragging && now - lastInteraction > 3000) theta += 0.0022;
+    placeCamera();
+
+    // CAD opacity: fades in as you scroll through the hero, unless overridden
+    var target;
+    if (cadMode === "on") target = 0.85;
+    else if (cadMode === "off") target = 0;
+    else target = 0.85 * Math.max(0, Math.min(1, f * 1.6));
+    cadPts.material.opacity += (target - cadPts.material.opacity) * 0.08;
+    // scan dims slightly as CAD comes in, so the overlay reads
+    scanPts.material.opacity = 0.9 - 0.25 * (cadPts.material.opacity / 0.85);
+
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
