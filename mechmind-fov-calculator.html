@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mech-Mind FOV / Distance Calculator</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --ink:#1c2430; --muted:#65718a;
+    --line:#e3e7ee; --accent:#2f6df6; --accent-soft:#e8f0ff;
+    --good:#15834b; --good-soft:#e4f6ec; --warn:#b4690e; --warn-soft:#fdf1de;
+    --bad:#c0392b; --bad-soft:#fdecea; --fov:#cfe0ff; --part:#2f6df6;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:var(--bg);color:var(--ink);line-height:1.45}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 20px 60px}
+  header{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .logo{width:34px;height:34px;border-radius:8px;background:var(--ink);color:#fff;
+        display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px}
+  h1{font-size:20px;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin:2px 0 22px}
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:20px}
+  @media(max-width:820px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+  .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 14px}
+  label{display:block;font-size:13px;font-weight:600;margin:14px 0 5px}
+  label:first-of-type{margin-top:0}
+  .hint{font-weight:400;color:var(--muted);font-size:12px}
+  input[type=number],select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:8px;
+        font-size:14px;background:#fff;color:var(--ink)}
+  .row{display:flex;gap:10px}
+  .row>div{flex:1}
+  .slider-row{display:flex;align-items:center;gap:10px;margin-top:6px}
+  input[type=range]{flex:1}
+  .dval{font-variant-numeric:tabular-nums;font-weight:700;min-width:78px;text-align:right}
+  /* results */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+  @media(max-width:560px){.cards{grid-template-columns:1fr}}
+  .card{border:1px solid var(--line);border-radius:10px;padding:14px;text-align:center}
+  .card .k{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .card .v{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:4px}
+  .card .u{font-size:12px;color:var(--muted)}
+  .card.min{background:var(--accent-soft)}
+  .card.opt{background:var(--good-soft)}
+  .card.max{background:var(--warn-soft)}
+  .banner{border-radius:10px;padding:12px 14px;font-size:13px;margin-bottom:16px;display:none}
+  .banner.show{display:block}
+  .banner.ok{background:var(--good-soft);color:var(--good)}
+  .banner.warn{background:var(--warn-soft);color:var(--warn)}
+  .banner.bad{background:var(--bad-soft);color:var(--bad)}
+  svg{width:100%;height:auto;display:block}
+  .vizwrap{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px;background:#fcfdff}
+  .vizwrap h3{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+  td{padding:6px 0;border-bottom:1px solid var(--line)}
+  td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+  tr:last-child td{border-bottom:none}
+  .foot{font-size:11.5px;color:var(--muted);margin-top:18px;line-height:1.6}
+  .foot code{background:#eef1f6;padding:1px 5px;border-radius:4px}
+  .pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;
+        background:var(--accent-soft);color:var(--accent);margin-left:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">T</div>
+    <div>
+      <h1>Mech-Mind FOV / Camera-to-Part Distance Calculator</h1>
+    </div>
+  </header>
+  <p class="sub">Confirm minimum, optimum, and maximum camera-to-part distance for a given part size. Toggle internal tool — Product Ops (Kit).</p>
+
+  <div class="grid">
+    <!-- INPUTS -->
+    <div class="panel">
+      <h2>Inputs</h2>
+
+      <label>Camera</label>
+      <select id="cam"></select>
+
+      <label>Part length <span class="hint">(longest in-plane dim, mm)</span></label>
+      <input type="number" id="pLen" value="800" min="1" step="10">
+
+      <label>Part width <span class="hint">(shorter in-plane dim, mm)</span></label>
+      <input type="number" id="pWid" value="500" min="1" step="10">
+
+      <label>Margin around part <span class="hint">(border each axis, %)</span></label>
+      <input type="number" id="margin" value="10" min="0" max="45" step="1">
+
+      <label>Live distance check <span class="hint">(slide to test a placement)</span></label>
+      <div class="slider-row">
+        <input type="range" id="dSlider" min="800" max="3200" step="10" value="1500">
+        <span class="dval"><span id="dSliderVal">1500</span> mm</span>
+      </div>
+
+      <div class="foot" id="camMeta"></div>
+    </div>
+
+    <!-- RESULTS -->
+    <div class="panel">
+      <h2>Result</h2>
+
+      <div id="banner" class="banner"></div>
+
+      <div class="cards">
+        <div class="card min"><div class="k">Min distance</div><div class="v" id="rMin">—</div><div class="u">closest valid</div></div>
+        <div class="card opt"><div class="k">Optimum</div><div class="v" id="rOpt">—</div><div class="u">best resolution</div></div>
+        <div class="card max"><div class="k">Max distance</div><div class="v" id="rMax">—</div><div class="u">working-dist limit</div></div>
+      </div>
+
+      <div class="vizwrap">
+        <h3>Part inside FOV at slider distance (<span id="vizD">1500</span> mm)</h3>
+        <svg id="fovSvg" viewBox="0 0 520 320" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+
+      <div class="vizwrap">
+        <h3>Distance range (working envelope)</h3>
+        <svg id="lineSvg" viewBox="0 0 520 90" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+
+      <table id="detail"></table>
+    </div>
+  </div>
+
+  <p class="foot" id="footnotes"></p>
+</div>
+
+<script>
+/* ---------------------------------------------------------------------------
+   Camera data. FOV modelled as a linear function of working distance, fit
+   exactly through the two manufacturer-published FOV points (near + far).
+   Source: Mech-Mind official spec pages (docs.mech-mind.net).
+   To add a camera: copy a block and fill the published numbers.
+--------------------------------------------------------------------------- */
+const CAMERAS = {
+  "LSR L-GL": {
+    label: "Mech-Eye LSR L-GL",
+    wdMin: 1200, wdMax: 3000,            // recommended working distance, mm
+    near: {d:1200, w:1200, h:1000},      // FOV @ near, mm
+    far:  {d:3000, w:3000, h:2400},      // FOV @ far, mm
+    resW: 2048, resH: 1536,              // depth map resolution, px
+    accuracy: 1.0, repeat: 0.5, accAt: 3000, // VDI/VDE acc + Z repeatability @ ref dist (mm)
+    baseline: 380,
+    focusConfigs: [                       // object-focal-distance setups
+      {focus:1500, lo:1200, hi:1800},
+      {focus:2500, lo:1800, hi:3000}
+    ],
+    source: "docs.mech-mind.net/en/eye-3d-camera/latest/hardware/specifications-lsr-l.html"
+  }
+};
+
+const $ = id => document.getElementById(id);
+
+// linear interpolation/extrapolation of FOV vs distance through near/far points
+function fovAt(cam, d){
+  const lerp=(a,b)=> a.v + (b.v-a.v)*(d-a.d)/(b.d-a.d);
+  return {
+    w: lerp({d:cam.near.d,v:cam.near.w},{d:cam.far.d,v:cam.far.w}),
+    h: lerp({d:cam.near.d,v:cam.near.h},{d:cam.far.d,v:cam.far.h})
+  };
+}
+// smallest distance at which FOV (axis) >= required size; invert linear model
+function distForFov(near, far, required){
+  // fov(d) = near.v + slope*(d-near.d);  solve fov=required
+  const slope=(far.v-near.v)/(far.d-near.d);
+  return near.d + (required-near.v)/slope;
+}
+
+function compute(){
+  const cam = CAMERAS[$("cam").value];
+  let a = Math.max(+$("pLen").value||0, +$("pWid").value||0); // long
+  let b = Math.min(+$("pLen").value||0, +$("pWid").value||0); // short
+  const fill = 1 - (Math.min(Math.max(+$("margin").value||0,0),45)/100); // max fraction of FOV part may occupy
+
+  // required FOV (with margin) -> distance that satisfies each axis
+  const dForLong = distForFov({d:cam.near.d,v:cam.near.w},{d:cam.far.d,v:cam.far.w}, a/fill);
+  const dForShort= distForFov({d:cam.near.d,v:cam.near.h},{d:cam.far.d,v:cam.far.h}, b/fill);
+  const dFit = Math.max(dForLong, dForShort);          // must be >= this to fit with margin
+  const bindAxis = dForLong>=dForShort ? "length (FOV width)" : "width (FOV height)";
+
+  const dMin = Math.max(cam.wdMin, dFit);              // closest valid placement
+  const dMax = cam.wdMax;                               // far optical limit
+  const dOpt = dMin;                                    // closest valid -> most pixels on part
+
+  // status
+  let status, msg;
+  if (dFit > cam.wdMax){
+    status="bad"; msg="Part too large. Even at the "+cam.wdMax+" mm working-distance limit the part + "+
+      (+$("margin").value)+"% margin won't fit the FOV. Reduce margin, rotate the part, split the scan, or use a wider-FOV camera (e.g. LSR XL-GL).";
+  } else if (dFit < cam.wdMin){
+    status="ok"; msg="Fits comfortably. Part fits inside the FOV across the full working range; optimum is the closest distance ("+cam.wdMin+" mm) for maximum resolution.";
+  } else {
+    status="warn"; msg="Fits within range. Binding axis: part "+bindAxis+". Place no closer than "+Math.round(dMin)+" mm or the part will overflow the FOV.";
+  }
+
+  // metrics at optimum
+  const fOpt = fovAt(cam, dOpt);
+  const resH_mm = fOpt.w / cam.resW;   // mm per pixel, horizontal
+  const resV_mm = fOpt.h / cam.resH;
+  const accEst  = cam.accuracy * Math.pow(dOpt/cam.accAt,2);
+  const repEst  = cam.repeat  * Math.pow(dOpt/cam.accAt,2);
+  const fillPctW = (a / fOpt.w *100);
+  const fillPctH = (b / fOpt.h *100);
+  const focus = (cam.focusConfigs||[]).find(c=> dOpt>=c.lo && dOpt<=c.hi);
+
+  return {cam,a,b,fill,dMin,dMax,dOpt,dFit,status,msg,fOpt,resH_mm,resV_mm,accEst,repEst,fillPctW,fillPctH,focus,bindAxis};
+}
+
+function fmt(n,dec=0){return n.toLocaleString(undefined,{maximumFractionDigits:dec,minimumFractionDigits:dec});}
+
+function render(){
+  const r = compute();
+  const cam = r.cam;
+
+  $("rMin").textContent = r.dFit>cam.wdMax ? "—" : fmt(r.dMin);
+  $("rOpt").textContent = r.dFit>cam.wdMax ? "—" : fmt(r.dOpt);
+  $("rMax").textContent = fmt(r.dMax);
+  document.querySelectorAll('.card .u')[0].textContent = "closest valid · mm";
+  $("rMin").insertAdjacentHTML;
+  $("rOpt").nextElementSibling.textContent = "best resolution · mm";
+  $("rMax").nextElementSibling.textContent = "working limit · mm";
+
+  const b=$("banner"); b.className="banner show "+r.status; b.textContent=r.msg;
+
+  // detail table
+  const focusTxt = r.focus ? (r.focus.focus+" mm focus config ("+r.focus.lo+"–"+r.focus.hi+" mm)") : "between/outside focus configs — verify focus";
+  $("detail").innerHTML = `
+    <tr><td>FOV at optimum (${fmt(r.dOpt)} mm)</td><td>${fmt(r.fOpt.w)} × ${fmt(r.fOpt.h)} mm</td></tr>
+    <tr><td>Part fills FOV</td><td>${fmt(r.fillPctW)}% W · ${fmt(r.fillPctH)}% H</td></tr>
+    <tr><td>Spatial resolution at optimum</td><td>${fmt(r.resH_mm,2)} × ${fmt(r.resV_mm,2)} mm/px</td></tr>
+    <tr><td>Est. measurement accuracy <span class="hint">(scaled ∝ d²)</span></td><td>${fmt(r.accEst,2)} mm</td></tr>
+    <tr><td>Est. Z repeatability <span class="hint">(scaled ∝ d²)</span></td><td>${fmt(r.repEst,2)} mm</td></tr>
+    <tr><td>Recommended focus setup</td><td>${focusTxt}</td></tr>`;
+
+  drawFov(r);
+  drawLine(r);
+
+  $("camMeta").innerHTML =
+    `<b>${cam.label}</b><br>Working distance ${cam.wdMin}–${cam.wdMax} mm · baseline ${cam.baseline} mm<br>`+
+    `FOV ${cam.near.w}×${cam.near.h} @ ${cam.near.d/1000} m → ${cam.far.w}×${cam.far.h} @ ${cam.far.d/1000} m<br>`+
+    `Depth res ${cam.resW}×${cam.resH} · acc ${cam.accuracy} mm & Z-rep ${cam.repeat} mm @ ${cam.accAt/1000} m (VDI/VDE)`;
+
+  $("footnotes").innerHTML =
+    `<b>Method.</b> FOV is modelled as a linear function of working distance, fit exactly through the two manufacturer-published FOV points. `+
+    `Min distance = closest placement where the part plus margin fits the FOV (never below the camera's min working distance). `+
+    `Optimum = that closest valid distance, which puts the most pixels on the part. Max = the camera's far working-distance limit. `+
+    `Accuracy and repeatability are published at the reference distance and scaled here by (d/d_ref)² as a triangulation estimate — treat as guidance, confirm on the bench. `+
+    `Assumes the part is presented flat and roughly centered, long axis along the FOV width. `+
+    `Source: <code>${cam.source}</code>.`;
+}
+
+function drawFov(r){
+  const svg=$("fovSvg"); const W=520,H=320,pad=24;
+  const d=+$("dSlider").value;
+  const f=fovAt(r.cam,d);
+  // scale FOV to box
+  const availW=W-pad*2, availH=H-pad*2-18;
+  const s=Math.min(availW/f.w, availH/f.h);
+  const fw=f.w*s, fh=f.h*s;
+  const fx=(W-fw)/2, fy=pad+10+(availH-fh)/2;
+  const pw=r.a*s, ph=r.b*s;
+  const px=fx+(fw-pw)/2, py=fy+(fh-ph)/2;
+  const overflow = r.a>f.w || r.b>f.h;
+  const inWD = d>=r.cam.wdMin && d<=r.cam.wdMax;
+  let parts=[];
+  parts.push(`<rect x="${fx}" y="${fy}" width="${fw}" height="${fh}" fill="var(--fov)" stroke="#9fc0ff" rx="3"/>`);
+  parts.push(`<text x="${fx}" y="${fy-6}" font-size="11" fill="var(--muted)">FOV ${fmt(f.w)} × ${fmt(f.h)} mm</text>`);
+  const pc = overflow ? "var(--bad)" : "var(--part)";
+  parts.push(`<rect x="${px}" y="${py}" width="${pw}" height="${ph}" fill="${pc}" opacity="0.85" rx="2"/>`);
+  parts.push(`<text x="${px+pw/2}" y="${py+ph/2+4}" font-size="11" fill="#fff" text-anchor="middle">part ${fmt(r.a)}×${fmt(r.b)}</text>`);
+  let tag = overflow ? "⚠ part exceeds FOV" : (inWD?"✓ fits & in working range":"⚠ outside working distance");
+  let tagc = overflow||!inWD ? "var(--bad)" : "var(--good)";
+  parts.push(`<text x="${W/2}" y="${H-8}" font-size="12" fill="${tagc}" text-anchor="middle" font-weight="600">${tag}</text>`);
+  svg.innerHTML=parts.join("");
+  $("vizD").textContent=fmt(d);
+}
+
+function drawLine(r){
+  const svg=$("lineSvg"); const W=520,pad=40,y=46;
+  const lo=800, hi=3200; // axis span
+  const X=v=> pad+(v-lo)/(hi-lo)*(W-pad*2);
+  let p=[];
+  // working envelope band
+  p.push(`<rect x="${X(r.cam.wdMin)}" y="${y-9}" width="${X(r.cam.wdMax)-X(r.cam.wdMin)}" height="18" fill="var(--accent-soft)" stroke="#bcd2ff" rx="3"/>`);
+  p.push(`<line x1="${pad}" y1="${y}" x2="${W-pad}" y2="${y}" stroke="var(--line)" stroke-width="2"/>`);
+  // ticks
+  [800,1200,1800,2400,3000,3200].forEach(t=>{
+    p.push(`<line x1="${X(t)}" y1="${y-4}" x2="${X(t)}" y2="${y+4}" stroke="var(--muted)"/>`);
+    p.push(`<text x="${X(t)}" y="${y+22}" font-size="10" fill="var(--muted)" text-anchor="middle">${t}</text>`);
+  });
+  function mark(v,color,lab,up){
+    if(v>hi||v<lo) return;
+    const yy=up?y-14:y+ (lab==="slider"?0:0);
+    p.push(`<line x1="${X(v)}" y1="${y-12}" x2="${X(v)}" y2="${y+12}" stroke="${color}" stroke-width="2"/>`);
+    p.push(`<text x="${X(v)}" y="${y-16}" font-size="10" fill="${color}" text-anchor="middle" font-weight="700">${lab}</text>`);
+  }
+  if(r.dFit<=r.cam.wdMax){
+    mark(r.dMin,"var(--accent)","min");
+    mark(r.dOpt,"var(--good)","opt");
+  }
+  mark(r.dMax,"var(--warn)","max");
+  // slider pointer
+  const ds=+$("dSlider").value;
+  p.push(`<polygon points="${X(ds)-5},${y+14} ${X(ds)+5},${y+14} ${X(ds)},${y+24}" fill="var(--ink)"/>`);
+  svg.innerHTML=p.join("");
+}
+
+// init
+(function(){
+  const sel=$("cam");
+  Object.keys(CAMERAS).forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=CAMERAS[k].label;sel.appendChild(o);});
+  ["cam","pLen","pWid","margin"].forEach(id=>$(id).addEventListener("input",render));
+  $("dSlider").addEventListener("input",()=>{$("dSliderVal").textContent=fmt(+$("dSlider").value);render();});
+  render();
+})();
+</script>
+</body>
+</html>
