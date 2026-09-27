@@ -193,6 +193,142 @@ tr.tap{cursor:pointer}tr.tap:active td{background:var(--surface-3)}
 .splash h1{font-size:120px;line-height:.92;font-weight:900;font-stretch:75%;text-transform:uppercase;margin:0}
 .splash p{font-size:26px;color:var(--ink-muted);max-width:1100px;line-height:1.45;margin:0}
 .hint{font-size:20px;color:var(--ink-subtle)}
+
+/* ===== v2 touch sizing (preview) ===== */
+/* top strip: same 80px height, bigger content */
+.bar{gap:32px;padding:0 24px 0 0}
+.bar .logo{height:45px}
+.bar .station{font-size:33px}
+.bar .role{font-size:24px}
+.menu-btn{height:80px;min-width:220px;border:0;border-right:2px solid var(--line);border-radius:0;background:var(--surface);font-size:30px;gap:14px;padding:0 28px}
+.menu-btn svg{width:36px;height:36px}
+.chips{height:80px}
+.chip{font-size:30px;height:64px;gap:12px}
+.chip i{width:20px;height:20px}
+/* bottom action buttons: twice as tall, same widths */
+.right{grid-template-rows:minmax(0,1fr) auto}
+.actions{padding-top:16px}
+.actions .btn{min-height:208px;font-size:30px;padding:0 24px;min-width:220px}
+.actions .btn.primary{min-height:208px;font-size:38px;min-width:360px}
+/* results area: ~1.5x text */
+.evidence{gap:18px;padding-top:64px;padding-bottom:8px;overflow-y:auto}
+.title{font-size:66px;line-height:74px}
+.body-lg{font-size:42px;line-height:54px}
+.body-txt{font-size:32px;line-height:44px}
+.num-lg{font-size:104px;line-height:92px}
+.label{font-size:26px;line-height:32px}
+.context{grid-template-columns:260px 1fr;row-gap:12px}
+.context dt{font-size:26px}
+.context dd{font-size:38px}
+.callout{padding:22px 32px;gap:6px}
+.callout .name{font-size:42px;line-height:50px}
+.callout .dev{font-size:64px;line-height:72px}
+.inferred{font-size:26px;height:52px;padding:0 16px;border-width:3px}
+.inf-line{font-size:32px;gap:20px;flex-wrap:wrap}
+.link{font-size:32px}
+.why{font-size:28px;line-height:38px;padding:20px 24px}
+.stat{font-size:30px}.stat b{font-size:72px}
+.plabels{font-size:34px}
+.seg{height:28px}
+
+/* ===== v3 tweaks ===== */
+.bar .logo{height:32px}
+.bar .station{font-size:24px;font-weight:600;color:var(--ink-muted)}
+.actions{gap:24px}
+.actions .info{flex:1;margin-right:0;display:flex;gap:24px}
+.actions .info:has(.btn + .btn) .btn{flex:1;min-width:0}
+/* verdict drawer */
+.body{transition:grid-template-columns 200ms ease}
+.body.collapsed{grid-template-columns:176px minmax(0,1fr)}
+.vwrap{position:relative;height:100%}
+.verdict{transition:padding 200ms}
+.collapsed .verdict{padding:24px 12px;gap:16px}
+.collapsed .verdict svg{width:112px;height:112px}
+.collapsed .verdict .word{font-size:52px}
+.drawer-tab{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:4;width:72px;height:220px;border:0;border-radius:8px 0 0 8px;background:rgba(16,24,32,.18);color:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;font:700 18px/1 var(--font-sans);letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.drawer-tab svg{width:40px;height:40px}
+.drawer-tab:active{background:rgba(16,24,32,.32)}
+.collapsed .drawer-tab{right:0;width:100%;height:120px;top:auto;bottom:32px;transform:none;border-radius:0}
+.verdict.fail .drawer-tab,.verdict.fail+.drawer-tab{color:#fff}
+/* card carousel */
+.carousel{display:grid;grid-template-columns:96px minmax(0,1fr) 96px;gap:16px;align-items:stretch}
+.carousel .arrow{border:2px solid var(--line-strong);background:var(--surface);border-radius:var(--radius-1);font:700 44px/1 var(--font-sans);cursor:pointer;min-height:160px}
+.carousel .arrow:active{background:var(--surface-3)}
+.carousel .arrow[disabled]{border-color:var(--line);color:var(--line);cursor:default}
+.cviewport{overflow:hidden;touch-action:pan-y}
+.ctrack{display:flex;transition:transform 220ms ease}
+.ctrack>.callout{flex:0 0 100%}
+.dots{display:flex;gap:12px;justify-content:center;align-items:center;font-size:24px;color:var(--ink-muted);font-weight:600}
+.dots i{width:14px;height:14px;border-radius:50%;background:var(--line);display:inline-block}
+.dots i.on{background:var(--ink)}
+/* collapsed detail view */
+.cards-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.cards-row .callout{padding:20px 24px}
+.cards-row .callout .name{font-size:32px;line-height:38px}
+.cards-row .callout .dev{font-size:48px;line-height:56px}
+.cards-row .callout .body-txt{font-size:24px;line-height:32px}
+.detail-table table.t{font-size:26px}
+.detail-table table.t td{height:60px}
+.detail-head{display:flex;align-items:baseline;gap:24px}
+.detail-head .num-lg{font-size:80px;line-height:80px}
+
+.actions .btn{font-size:28px;padding:0 14px}
+.actions .btn.primary{font-size:38px}
+.drawer-tab{width:96px;height:260px;background:rgba(16,24,32,.30);font-size:20px;gap:14px}
+.drawer-tab svg{width:52px;height:52px}
+.drawer-tab:active{background:rgba(16,24,32,.45)}
+.collapsed .drawer-tab{height:150px}
+.carousel .arrow{font-size:0;display:flex;align-items:center;justify-content:center}
+.carousel .arrow svg{width:48px;height:48px}
+
+/* ===== v4: card nav options, motion, hover ===== */
+:root{--ease-out:cubic-bezier(.2,.8,.2,1)}
+.callout{background:var(--surface-3)}
+.callout .name{color:var(--fail)}
+.drawer-tab{font-size:22px;letter-spacing:.1em}
+.body{transition:grid-template-columns 180ms var(--ease-out)}
+.ctrack{transition:transform 180ms var(--ease-out)}
+.evidence.fadeout{opacity:0;transition:opacity 90ms linear}
+.evidence.fadein{animation:fadein 140ms linear}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+.btn,.arrow,.ezone,.ftab,.drawer-tab,.menu-btn,.key,.back,.tolbtn{transition:transform 80ms var(--ease-out),background-color 120ms linear,opacity 80ms linear}
+.btn:active,.btn.pressed,.arrow:active,.ezone:active,.ftab:active,.back:active,.key:active{transform:scale(.97)}
+/* keep carousel parts from shrinking inside the evidence column */
+.evidence>.cviewport,.evidence>.carousel,.evidence>.cnav,.evidence>.dots,.evidence>.ftabs,.evidence>.callout{flex-shrink:0}
+/* bar below (default) */
+.cnav{display:grid;grid-template-columns:140px 1fr 140px;gap:16px;align-items:center}
+.cnav .arrow,.carousel.sidearrows .arrow{border:2px solid var(--line-strong);background:var(--surface);border-radius:var(--radius-1);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:0}
+.cnav .arrow{height:96px}
+.cnav .arrow svg,.carousel .arrow svg,.ezone svg{width:48px;height:48px}
+.cnav .dots{justify-content:center}
+.arrow[disabled]{border-color:var(--line)!important;color:var(--line);cursor:default;transform:none!important}
+/* side */
+.carousel.sidearrows{display:grid;grid-template-columns:96px minmax(0,1fr) 96px;gap:16px}
+/* card edges */
+.carousel.edge{position:relative;display:block}
+.carousel.edge .callout{padding-left:112px;padding-right:112px}
+.ezone{position:absolute;top:0;bottom:0;width:96px;border:0;background:rgba(16,24,32,.06);color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.ezone.prev{left:0}.ezone.next{right:0}
+.ezone[disabled]{color:transparent;background:transparent;cursor:default}
+/* name tabs */
+.ftabs{display:flex;gap:12px;flex-wrap:wrap}
+.ftab{min-height:72px;padding:0 20px;border:2px solid var(--line-strong);background:var(--surface);border-radius:var(--radius-1);font:700 24px/1.1 var(--font-sans);display:inline-flex;align-items:center;gap:10px;cursor:pointer;max-width:320px;text-align:left}
+.ftab .x{color:var(--fail)}
+.ftab.on{background:var(--ink);color:#fff}.ftab.on .x{color:#FF8A94}
+/* mouse hover (only on devices that hover) */
+@media (hover:hover){
+ .btn.primary:hover,.back:hover,.key.ok:hover{background:#2A3542}
+ .btn.secondary:hover,.menu-btn:hover,.tolbtn:hover,.key:hover,.cnav .arrow:not([disabled]):hover,.carousel.sidearrows .arrow:not([disabled]):hover,.ftab:not(.on):hover{background:var(--surface-2)}
+ .btn.destructive:hover{background:var(--fail-soft)}
+ .chips:hover{background:rgba(16,24,32,.05)}
+ .drawer-tab:hover{background:rgba(16,24,32,.40)}
+ .ezone:not([disabled]):hover{background:rgba(16,24,32,.12)}
+ .link:hover{text-decoration-thickness:3px}
+ tr.tap:hover td{background:var(--surface-2)}
+ .side .item:hover{background:var(--surface-2)}
+ .seg-ctl button:not(.on):hover{background:var(--surface-2)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
@@ -239,7 +375,7 @@ const CHECKS={
 /* ---------- state ---------- */
 const S={screen:'ready',role:'operator',pi:0,counts:{pass:41,fail:3,check:2},force:'auto',lastCause:null,result:null,
   camShift:false,erpDown:false,history:[],takeover:null,overlay:null,why:false,mapZoom:1,
-  mgrTpl:null,units:'frac',tolEdit:null,dirty:false,histFilter:'all',diag:null};
+  mgrTpl:null,drawer:false,ci:0,units:'frac',tolEdit:null,dirty:false,histFilter:'all',diag:null};
 function tpl(fam){return TEMPLATES.find(t=>t.name===fam)||TEMPLATES[0];}
 function part(){return PARTS[S.pi%PARTS.length];}
 
@@ -268,7 +404,8 @@ function simulate(){
   const q=1/32;
   const feats=t.features.map(f=>{const d=Math.round((Math.random()*1.4-.7)*(f.tol/q))*q;return {...f,meas:f.nom+d,dev:d,state:'pass'}});
   let cause=null;
-  if(out==='fail'){const i=Math.random()<.5?3:Math.floor(Math.random()*feats.length);const f=feats[i];const over=f.tol+q*(1+Math.floor(Math.random()*2));f.dev=(Math.random()<.5?1:-1)*over;f.meas=f.nom+f.dev;f.state='fail';}
+  if(out==='fail3'){[3,0,4].forEach(i=>{const f=feats[i];const over=f.tol+q*(1+Math.floor(Math.random()*2));f.dev=(Math.random()<.5?1:-1)*over;f.meas=f.nom+f.dev;f.state='fail'});out='fail';}
+  else if(out==='fail'){const i=Math.random()<.5?3:Math.floor(Math.random()*feats.length);const f=feats[i];const over=f.tol+q*(1+Math.floor(Math.random()*2));f.dev=(Math.random()<.5?1:-1)*over;f.meas=f.nom+f.dev;f.state='fail';}
   if(out==='check'){cause=S.camShift?'cam':['edge','reg','edge','unknown'][Math.floor(Math.random()*4)];}
   const inf=t.inferred.map(f=>({...f,meas:f.nom}));
   const res={out,feats,inf,cause,part:p,time:new Date(),id:'SC-'+(10480+S.history.length+S.counts.pass+S.counts.fail+S.counts.check)};
@@ -314,26 +451,46 @@ function vScanning(stage){
   <div class="grow"></div>${ctx(p)}</div>
   <div class="actions"><button class="btn secondary" data-a="cancelscan">Cancel scan</button></div></div></div>`;
 }
+function failCard(f){return `<div class="callout"><span class="label">Out of tolerance</span><span class="name">${f.n}</span><span class="dev">${dev(Math.abs(f.dev)-f.tol).replace('+','')} ${f.dev>0?'over':'under'} limit</span><span class="body-txt">Measured ${len(f.meas)} · nominal ${len(f.nom)} · tol ${tolf(f.tol)}</span></div>`}
+function carousel(cards,names){
+  if(cards.length===1) return cards[0];
+  const i=Math.min(S.ci,cards.length-1), n=cards.length, v=S.nav||'edge';
+  const track=`<div class="cviewport" id="cvp"><div class="ctrack" style="transform:translateX(-${i*100}%)">${cards.join('')}</div></div>`;
+  const dots=`<div class="dots">${cards.map((_,k)=>`<i class="${k===i?'on':''}"></i>`).join('')}<span class="count">${i+1} of ${n}</span></div>`;
+  const prev=`<button class="arrow prev" data-a="cprev"${i===0?' disabled':''} aria-label="Previous">${CHEV_L}</button>`;
+  const next=`<button class="arrow next" data-a="cnext"${i===n-1?' disabled':''} aria-label="Next">${CHEV_R}</button>`;
+  if(v==='side') return `<div class="carousel sidearrows">${prev}${track}${next}</div>${dots}`;
+  if(v==='tabs') return `<div class="ftabs">${names.map((nm,k)=>`<button class="ftab${k===i?' on':''}" data-a="cgo" data-v="${k}"><span class="x">✕</span>${nm}</button>`).join('')}</div>${track}`;
+  if(v==='edge') return `<div class="carousel edge">${track}<button class="ezone prev" data-a="cprev"${i===0?' disabled':''} aria-label="Previous">${CHEV_L}</button><button class="ezone next" data-a="cnext"${i===n-1?' disabled':''} aria-label="Next">${CHEV_R}</button></div>${dots}`;
+  return `${track}<div class="cnav">${prev}${dots}${next}</div>`; // bar (default)
+}
+const CHEV_L='<svg viewBox="0 0 40 40" fill="none"><path d="M26 6L12 20l14 14" stroke="currentColor" stroke-width="5"/></svg>';
+const CHEV_R='<svg viewBox="0 0 40 40" fill="none"><path d="M14 6l14 14-14 14" stroke="currentColor" stroke-width="5"/></svg>';
 function vResult(){
   const r=S.result,p=r.part;
   const word={pass:'Pass',fail:'Fail',check:'Check'}[r.out],icon={pass:IC.check,fail:IC.x,check:IC.warn}[r.out];
+  const bad=r.feats.filter(f=>f.state==='fail');
   let ev='';
-  if(r.out==='pass'){
+  if(S.drawer && r.out!=='check'){
+    // detail view: more room
+    const head=r.out==='pass'?`<div class="detail-head"><div class="num-lg">${r.feats.length} of ${r.feats.length}</div><p class="body-lg">features in tolerance</p></div>`:`<div class="detail-head"><div class="num-lg">${bad.length} of ${r.feats.length}</div><p class="body-lg">feature${bad.length>1?'s':''} out of tolerance</p></div>`;
+    ev=head+(bad.length?`<div class="cards-row">${bad.slice(0,3).map(failCard).join('')}</div>`:'')+`<div class="detail-table">${measTable(r)}</div>`;
+  } else if(r.out==='pass'){
     ev=`<div class="num-lg">${r.feats.length} of ${r.feats.length}</div><p class="body-lg">features in tolerance</p>`;
     if(r.inf.length) ev+=`<div class="inf-line"><span class="inferred">Inferred</span>${r.inf.length} more estimated from CAD, not in PASS/FAIL. <button class="link" data-a="why">${S.why?'Hide':'Why?'}</button></div>`+(S.why?`<div class="why">Filleted edges curve away from the camera, so the last few millimetres of the edge can't be seen. Toggle projects the edge from the CAD model. These values are shown for reference and never decide PASS or FAIL.</div>`:'');
   } else if(r.out==='fail'){
-    const bad=r.feats.filter(f=>f.state==='fail');
-    ev=`<div class="num-lg">${bad.length} of ${r.feats.length}</div><p class="body-lg">feature${bad.length>1?'s':''} out of tolerance</p>`+bad.slice(0,3).map(f=>`<div class="callout"><span class="label">Out of tolerance</span><span class="name">${f.n}</span><span class="dev">${dev(Math.abs(f.dev)-f.tol).replace('+','')} ${f.dev>0?'over':'under'} limit</span><span class="body-txt">Measured ${len(f.meas)} · nominal ${len(f.nom)} · tol ${tolf(f.tol)}</span></div>`).join('');
+    ev=`<div class="num-lg">${bad.length} of ${r.feats.length}</div><p class="body-lg">feature${bad.length>1?'s':''} out of tolerance</p>`+carousel(bad.map(failCard),bad.map(f=>f.n));
   } else {
     const c=CHECKS[r.cause];
     ev=`<span class="label">No result yet · next step needed</span><h1 class="title">${c.title}</h1><p class="body-lg">${c.fix}</p><p class="body-txt">Still showing CHECK after 2 tries? Call your QC lead.</p>`;
   }
   let acts='';
   if(r.out==='pass') acts=`<div class="info"><button class="btn secondary" data-a="meas">Measurements</button><button class="btn secondary" data-a="map">Map</button></div><button class="btn primary" data-a="next">Next part</button>`;
-  if(r.out==='fail') acts=`<div class="info"><button class="btn secondary" data-a="meas">Measurements</button></div><button class="btn secondary" data-a="rescan">Rescan</button><button class="btn primary" data-a="setaside">Next part</button>`;
+  if(r.out==='fail') acts=`<div class="info"><button class="btn secondary" data-a="meas">Measurements</button><button class="btn secondary" data-a="rescan">Rescan</button></div><button class="btn primary" data-a="setaside">Next part</button>`;
   if(r.out==='check') acts=r.cause==='unknown'?`<div class="info"><button class="btn secondary" data-a="rescan">Rescan</button></div><button class="btn primary" data-a="next">Skip part</button>`:`<div class="info"><button class="btn secondary" data-a="next">Skip part</button></div><button class="btn primary" data-a="rescan">Rescan</button>`;
-  return `<div class="body"><div><div class="verdict ${r.out}">${icon}<p class="word">${word}</p></div></div>
-  <div class="right"><div class="evidence">${ev}<div class="grow"></div>${ctx(p)}</div><div class="actions">${acts}</div></div></div>`;
+  const tab=r.out==='check'?'':`<button class="drawer-tab" data-a="drawer" aria-label="${S.drawer?'Show less':'Show more'}">${S.drawer?CHEV_R:CHEV_L}<span>${S.drawer?'Less':'More'}</span></button>`;
+  return `<div class="body${S.drawer?' collapsed':''}"><div class="vwrap"><div class="verdict ${r.out}">${icon}<p class="word">${word}</p></div>${tab}</div>
+  <div class="right"><div class="evidence">${ev}<div class="grow"></div>${S.drawer?'':ctx(p)}</div><div class="actions">${acts}</div></div></div>`;
 }
 function measTable(r){
   if(r.out==='check') return `<p class="body-lg" style="margin-top:24px">No measurements. The station didn't produce a result for this scan.</p>`;
@@ -477,10 +634,19 @@ let demoOpen=false;
 function demoHTML(){
   const b=(v,l)=>`<button class="${S.force===v?'on':''}" data-a="force" data-v="${v}">${l}</button>`;
   return `<button class="demo-fab" data-a="demo">Demo</button>`+(demoOpen?`<div class="demo" data-stop><h4>Prototype controls</h4><p>Next scan result</p>
-  <div class="seg-ctl">${b('auto','Random')}${b('pass','Pass')}${b('fail','Fail')}${b('check','Check')}</div>
+  <div class="seg-ctl">${b('auto','Random')}${b('pass','Pass')}${b('fail','Fail')}${b('fail3','Fail ×3')}${b('check','Check')}</div>
   <div style="display:flex;gap:12px;flex-wrap:wrap"><button class="btn secondary sm" data-a="shift">${S.camShift?'Clear':'Simulate'} camera shift</button><button class="btn secondary sm" data-a="toggleerp">${S.erpDown?'Restore':'Drop'} ERP</button><button class="btn secondary sm" data-a="fs">Full screen</button></div></div>`:'');
 }
 
+/* in-place carousel move (keeps the slide animation) */
+function go2(k){const n=S.result?S.result.feats.filter(f=>f.state==='fail').length:1;k=Math.max(0,Math.min(n-1,k));if(k===S.ci)return;S.ci=k;
+  const t=document.querySelector('.ctrack');if(!t){render();return}
+  t.style.transform=`translateX(-${k*100}%)`;
+  document.querySelectorAll('.dots i').forEach((d,j)=>d.classList.toggle('on',j===k));
+  const c=document.querySelector('.dots .count');if(c)c.textContent=`${k+1} of ${n}`;
+  document.querySelectorAll('[data-a=cprev]').forEach(b=>b.toggleAttribute('disabled',k===0));
+  document.querySelectorAll('[data-a=cnext]').forEach(b=>b.toggleAttribute('disabled',k===n-1));
+  document.querySelectorAll('.ftab').forEach((b,j)=>b.classList.toggle('on',j===k));}
 /* ---------- toast ---------- */
 let tt;function toast(msg){let el=document.querySelector('.toast');if(!el){el=document.createElement('div');el.className='toast';$stage.appendChild(el)}el.textContent=msg;el.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>el.classList.remove('show'),2400)}
 
@@ -488,7 +654,7 @@ let tt;function toast(msg){let el=document.querySelector('.toast');if(!el){el=do
 function go(screen){S.screen=screen;S.takeover=null;S.overlay=null;S.why=false;render()}
 function startScan(){
   clearTimeout(scanTimer);S.screen='scanning';S.scanStage=0;S.takeover=null;S.why=false;render();
-  const step=(n,ms)=>{scanTimer=setTimeout(()=>{if(S.screen!=='scanning')return;if(n<3){S.scanStage=n;render();step(n+1,n===1?1300:500)}else{S.result=simulate();S.screen='result';render();buzz(S.result.out)}},ms)};
+  const step=(n,ms)=>{scanTimer=setTimeout(()=>{if(S.screen!=='scanning')return;if(n<3){S.scanStage=n;render();step(n+1,n===1?1300:500)}else{S.result=simulate();S.ci=0;S.drawer=false;S.screen='result';render();buzz(S.result.out)}},ms)};
   step(1,1400);
 }
 function buzz(out){if(navigator.vibrate)navigator.vibrate(out==='pass'?40:out==='fail'?[60,60,60]:[40,40,40,40,40])}
@@ -540,6 +706,13 @@ const A={
   shift(){S.camShift=!S.camShift;render();toast(S.camShift?'Camera shift simulated: next scan shows CHECK':'Camera shift cleared')},
   toggleerp(){S.erpDown=!S.erpDown;render();toast(S.erpDown?'ERP offline: results will queue':'ERP connected')},
   force(v){S.force=v;render()},
+  nav(v){S.nav=v;render()},
+  cprev(){go2(S.ci-1)},
+  cgo(v){go2(+v)},
+  cnext(){go2(S.ci+1)},
+  drawer(){const b=document.querySelector('.body');if(!b){S.drawer=!S.drawer;render();return}
+    S.drawer=!S.drawer;const ev=document.querySelector('.evidence');if(ev)ev.classList.add('fadeout');
+    b.classList.toggle('collapsed',S.drawer);setTimeout(()=>{render();const e2=document.querySelector('.evidence');if(e2)e2.classList.add('fadein')},190)},
   demo(){demoOpen=!demoOpen;render()},
   fs(){const d=document.documentElement;(d.requestFullscreen||d.webkitRequestFullscreen||function(){}).call(d)},
   toast(v){toast(v)},
@@ -556,6 +729,9 @@ $stage.addEventListener('click',e=>{
   if(el.hasAttribute('disabled'))return;
   const a=el.dataset.a;if(A[a])A[a](el.dataset.v);
 });
+let sx=null;
+$stage.addEventListener('pointerdown',e=>{if(e.target.closest('#cvp'))sx=e.clientX});
+$stage.addEventListener('pointerup',e=>{if(sx==null)return;const dx=e.clientX-sx;sx=null;if(Math.abs(dx)>60){dx<0?A.cnext():A.cprev()}});
 document.addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('gesturestart',e=>e.preventDefault());
 
